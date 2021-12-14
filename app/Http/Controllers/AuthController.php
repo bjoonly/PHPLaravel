@@ -170,7 +170,7 @@ class AuthController extends Controller
         ]);
 
         if($validator->fails()){
-            return response()->json($validator->errors(), Response::HTTP_BAD_REQUEST);
+            return response()->json($validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $user = User::create(array_merge(
@@ -252,7 +252,7 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'bearer',
             'expires_in' => auth()->factory()->getTTL() * 60,
-            'user' => auth()->user()
+           // 'user' => auth()->user()
         ], Response::HTTP_OK);
     }
 

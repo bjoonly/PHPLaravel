@@ -20,6 +20,7 @@ use Illuminate\Routing\Controller as BaseController;
  *     securityScheme="apiAuth",
  * )
  */
+
 class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
