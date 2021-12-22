@@ -35,7 +35,7 @@ Route::group([
 
 ], function ($router) {
 Route::post('/store', [ProductController::class, 'store']);
-Route::put('/update/{id}', [ProductController::class, 'update']);
+Route::post('/update/{id}', [ProductController::class, 'update']);
 Route::get('/index', [ProductController::class, 'index']);
 Route::get('/show/{id}', [ProductController::class, 'show']);
 Route::delete('/destroy/{id}', [ProductController::class, 'destroy']);

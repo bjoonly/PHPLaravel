@@ -5,13 +5,14 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Validator;
 use Symfony\Component\HttpFoundation\Response;
+use function PHPUnit\Framework\exactly;
 
 class ProductController extends Controller
 {
     /**
      * @OA\Get(
      *     tags={"Product"},
-     *     path="/api/products",
+     *     path="/api/products/index",
      *     @OA\Parameter(
      *      name="page",
      *      in="query",
@@ -20,7 +21,23 @@ class ProductController extends Controller
      *      )
      *   ),
      *     @OA\Parameter(
+     *      name="id",
+     *      in="query",
+     *      required=false,
+     *      @OA\Schema(
+     *           type="string"
+     *      )
+     *   ),
+     *        @OA\Parameter(
      *      name="name",
+     *      in="query",
+     *      required=false,
+     *      @OA\Schema(
+     *           type="string"
+     *      )
+     *   ),
+     *        @OA\Parameter(
+     *      name="detail",
      *      in="query",
      *      required=false,
      *      @OA\Schema(
@@ -37,15 +54,21 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        //$products = Product::all();
         $input = $request->all();
-        $name=isset($input["name"])? $input["name"] : "";
-        if(!empty($name))
-        {
-            $products = Product::where("name", 'LIKE', "%$name%")->paginate(2);
-            return response()->json($products);
-        }
-        $products = Product::paginate(2);
+        $filters = [
+            'id' => 'id',
+            'name' => 'name',
+            'detail' =>'detail',
+        ];
+
+        $products=Product::where(function ($query) use ($input, $filters) {
+            foreach ($filters as $column => $key) {
+                $query->when(\Arr::get($input, $key), function ($query, $value) use ($column) {
+                    $query->where($column,"LIKE", "%$value%");
+                });
+            }
+        })->paginate(2);
+
         return response()->json($products);
     }
 
@@ -70,6 +93,20 @@ class ProductController extends Controller
      *          type="string"
      *      )
      *   ),
+     *   @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(
+     *                     description="Image to upload",
+     *                     property="file",
+     *                     type="file",
+     *                ),
+     *                 required={"file"}
+     *             )
+     *         )
+     *     ),
      *   @OA\Response(
      *      response=200,
      *       description="Success",
@@ -107,6 +144,10 @@ class ProductController extends Controller
         if($validator->fails()){
             return response()->json($validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+        $imageName = uniqid().'.'.$request->file->extension();
+        $path = public_path('images');
+        $request->file->move($path, $imageName);
+        $input['image']= '/images/'.$imageName;
         $product = Product::create($input);
         return response()->json([
             "message" => "Product created successfully.",
@@ -162,7 +203,7 @@ class ProductController extends Controller
         ]);
     }
     /**
-     * @OA\Put(
+     * @OA\Post(
      *      path="/api/products/update/{id}",
      *      tags={"Product"},
      *      @OA\Parameter(
@@ -173,7 +214,7 @@ class ProductController extends Controller
      *              type="integer"
      *          )
      *      ),
-     *      @OA\Parameter(
+     *       @OA\Parameter(
      *      name="name",
      *      in="query",
      *      required=true,
@@ -181,20 +222,32 @@ class ProductController extends Controller
      *           type="string"
      *      )
      *   ),
-     *     @OA\Parameter(
+     *   @OA\Parameter(
      *      name="detail",
      *      in="query",
      *      required=true,
      *      @OA\Schema(
-     *           type="string"
+     *          type="string"
      *      )
      *   ),
+     *   @OA\RequestBody(
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(
+     *                     description="Image to upload",
+     *                     property="file",
+     *                     type="file",
+     *                ),
+     *             )
+     *         )
+     *     ),
      *      @OA\Response(
      *          response=200,
      *          description="Successful updated.",
      *          @OA\MediaType(
      *           mediaType="application/json",
-     *      )
+     *          )
      *       ),
      *      @OA\Response(
      *          response=400,
@@ -221,7 +274,7 @@ class ProductController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request,$id)
+    public function update(Request $request,int $id)
     {
         $input = $request->all();
         $validator = Validator::make($input, [
@@ -234,6 +287,16 @@ class ProductController extends Controller
         $product = Product::find($id);
         $product->name = $input['name'];
         $product->detail = $input['detail'];
+        if($request->file) {
+            $imageName = uniqid() . '.' . $request->file->extension();
+            $filePath=public_path().$product->image;
+            $path = public_path('images');
+            $request->file->move($path, $imageName);
+            $product->image='/images/'.$imageName;
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+        }
         $product->save();
         return response()->json([
             "message" => "Product updated successfully.",
@@ -282,6 +345,10 @@ class ProductController extends Controller
     public function destroy($id)
     {
         $product = Product::find($id);
+        $filePath=public_path().$product->image;
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
         $product->delete();
         return response()->json([
             "message" => "Product deleted successfully."
